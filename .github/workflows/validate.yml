@@ -1,0 +1,57 @@
+name: Validate Data Files
+
+on:
+  push:
+    branches: [main]
+    paths: ['data/**']
+  pull_request:
+    branches: [main]
+    paths: ['data/**']
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pandas
+        run: pip install pandas
+
+      - name: Validate CSV files
+        run: |
+          python3 << 'EOF'
+          import pandas as pd
+          import os, sys
+
+          errors = []
+          total = 0
+          for root, dirs, files in os.walk('data'):
+              for f in files:
+                  if f.endswith('.csv'):
+                      total += 1
+                      path = os.path.join(root, f)
+                      try:
+                          df = pd.read_csv(path)
+                          print(f"OK: {path} ({len(df)} rows, {len(df.columns)} cols)")
+                      except Exception as e:
+                          errors.append(f"{path}: {e}")
+                          print(f"FAIL: {path}: {e}")
+
+          print(f"\nValidated {total} CSV files, {len(errors)} errors")
+          if errors:
+              sys.exit(1)
+          EOF
+
+      - name: Summary
+        run: |
+          echo "### Data Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "All CSV files validated successfully." >> $GITHUB_STEP_SUMMARY
